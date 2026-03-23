@@ -38,7 +38,10 @@ services:
       context: ../acmf-ui
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: /api
+        # Use same-origin calls:
+        # - axios calls like "/api/projects" become "/api/projects"
+        # - auth calls like "/auth/login" become "/auth/login"
+        VITE_API_URL: ""
     container_name: acmf-ui
     restart: unless-stopped
     depends_on:
