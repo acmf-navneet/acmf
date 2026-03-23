@@ -15,7 +15,7 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/
 ARCH="$(dpkg --print-architecture)"
 CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
 echo \
-  "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${CODENAME} stable" \
+  "deb [arch=$${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $${CODENAME} stable" \
   > /etc/apt/sources.list.d/docker.list
 
 apt-get update -y
@@ -25,12 +25,12 @@ systemctl enable docker
 systemctl start docker
 
 # Ensure the SSH user can run docker without sudo.
-if id "${SSH_USER}" >/dev/null 2>&1; then
-  usermod -aG docker "${SSH_USER}" || true
+if id "$${SSH_USER}" >/dev/null 2>&1; then
+  usermod -aG docker "$${SSH_USER}" || true
 fi
 
-mkdir -p "${APP_DIR}/deploy"
-chown -R "${SSH_USER}:${SSH_USER}" "${APP_DIR}"
+mkdir -p "$${APP_DIR}/deploy"
+chown -R "$${SSH_USER}:$${SSH_USER}" "$${APP_DIR}"
 
 echo "Bootstrap complete."
 
