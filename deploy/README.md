@@ -69,3 +69,18 @@ docker compose --env-file .env.ec2 -f docker-compose.ec2.yml logs -f
 docker compose --env-file .env.ec2 -f docker-compose.ec2.yml ps
 docker compose --env-file .env.ec2 -f docker-compose.ec2.yml down
 ```
+
+## GitHub Actions (single pipeline)
+
+The monorepo uses one workflow at `.github/workflows/deploy-ec2.yml` to deploy both UI and API together to EC2.
+
+Set these repository secrets:
+- `EC2_HOST` (public DNS/IP)
+- `EC2_PUBLIC_IP` (public IPv4 for `FRONTEND_URLS`)
+- `EC2_USER` (for example `ubuntu`)
+- `EC2_SSH_PORT` (usually `22`)
+- `EC2_SSH_PRIVATE_KEY` (private key content for EC2 access)
+- `EC2_APP_DIR` (target path on EC2, for example `/home/ubuntu/acmf`)
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
