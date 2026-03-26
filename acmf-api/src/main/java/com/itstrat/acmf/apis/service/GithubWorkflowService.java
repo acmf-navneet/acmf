@@ -92,12 +92,16 @@ public class GithubWorkflowService {
                              # Explicitly run the webapp build before jib
                              ./gradlew -Pprod clean webapp -x test
                              ./gradlew jibDockerBuild -Pprod -x test -x javadoc -x integrationTest
-                          else
+                          elif [ -f "mvnw" ]; then
                              chmod +x mvnw
                              # Ensure Maven builds the production assets first
                              ./mvnw -Pprod clean package -DskipTests -Dmaven.javadoc.skip=true
                              # Then let Jib create the image from the packaged classes
                              ./mvnw jib:dockerBuild -Pprod -DskipTests
+                          elif [ -f "pom.xml" ]; then
+                             # Fallback when Maven wrapper isn't committed
+                             mvn -Pprod clean package -DskipTests -Dmaven.javadoc.skip=true
+                             mvn jib:dockerBuild -Pprod -DskipTests
                           fi
                 
                       - name: Set up Docker
