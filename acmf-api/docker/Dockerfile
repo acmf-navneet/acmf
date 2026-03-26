@@ -11,7 +11,7 @@ WORKDIR /app
 # The API needs the Docker CLI to generate JHipster projects by invoking `docker run`.
 # It also needs the host Docker daemon socket at `/var/run/docker.sock` (mounted via docker-compose).
 RUN apt-get update \
-  && apt-get install -y ca-certificates curl gnupg \
+  && apt-get install -y ca-certificates curl gnupg git \
   && install -m 0755 -d /etc/apt/keyrings \
   && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
   && ARCH="$(dpkg --print-architecture)" \
