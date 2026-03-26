@@ -39,7 +39,6 @@ const GenerateProject = () => {
       githubToken: "",
       githubOrganization: "",
       // Cloud Configuration
-      projectPath: "",
       cloudProvider: "aws",
       cloudService: "",
       accountId: "",
@@ -165,7 +164,6 @@ const GenerateProject = () => {
         githubUsername: previewData.githubUsername,
         githubToken: previewData.githubToken,
         githubOrganization: previewData.githubOrganization,
-        projectPath: previewData.projectPath,
         cloudProvider: previewData.cloudProvider,
         cloudService: previewData.cloudService,
         accountId: previewData.accountId,
@@ -230,7 +228,6 @@ const GenerateProject = () => {
         githubUsername: previewData.githubUsername,
         githubToken: previewData.githubToken,
         githubOrganization: previewData.githubOrganization,
-        projectPath: previewData.projectPath,
         cloudProvider: previewData.cloudProvider,
         cloudService: previewData.cloudService,
         accountId: previewData.accountId,

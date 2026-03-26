@@ -30,24 +30,6 @@ const AzureConfig = ({ title = "Cloud Configuration", fieldPrefix = "" }) => {
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor={getFieldName("projectPath")}>
-              Project Path <span className="text-red-500">*</span>
-            </Label>
-            <Field name={getFieldName("projectPath")}>
-              {({ field, meta }) => (
-                <>
-                  <Input
-                    {...field}
-                    id={getFieldName("projectPath")}
-                    placeholder="Project Path"
-                    className={meta.touched && meta.error ? "border-red-500" : ""}
-                  />
-                  <FormikErrorMessage name={getFieldName("projectPath")} />
-                </>
-              )}
-            </Field>
-          </div>
-          <div className="space-y-2">
             <Label>Cloud Provider</Label>
             <Field name={getFieldName("cloudProvider")}>
               {({ meta }) => (

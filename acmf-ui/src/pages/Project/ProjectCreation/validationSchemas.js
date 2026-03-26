@@ -21,9 +21,6 @@ export const githubConfigSchema = yup.object({
 });
 
 export const cloudConfigSchema = yup.object({
-  projectPath: yup
-    .string()
-    .required('Project path is required'),
   cloudProvider: yup
     .string()
     .optional(),

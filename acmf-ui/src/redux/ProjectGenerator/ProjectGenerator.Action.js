@@ -28,7 +28,6 @@ export const generateMicroserviceProject = (apiPayload) => {
     try {
       // 2. Build query parameters (Same as before)
       const queryParams = new URLSearchParams({
-        projectPath: apiPayload.projectPath || "",
         githubUsername: apiPayload.githubUsername || "",
         githubToken: apiPayload.githubToken || "",
         githubOrganization: apiPayload.githubOrganization || "",
@@ -76,7 +75,6 @@ export const generateMonolithicProject = (apiPayload) => {
     try {
       // 7. Build query parameters
       const queryParams = new URLSearchParams({
-        projectPath: apiPayload.projectPath || "",
         githubUsername: apiPayload.githubUsername || "",
         githubToken: apiPayload.githubToken || "",
         githubOrganization: apiPayload.githubOrganization || "",

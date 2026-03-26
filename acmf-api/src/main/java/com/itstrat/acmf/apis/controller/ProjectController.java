@@ -26,6 +26,7 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -212,7 +213,6 @@ public class ProjectController {
      * </p>
      *
      * @param jdlRequest          The JHipster JDL request containing project configuration.
-     * @param projectPath         Base path where the generated project will be stored temporarily.
      * @param githubUsername      GitHub username for repo creation and push.
      * @param githubToken         GitHub personal access token for authentication.
      * @param githubOrganization  (Optional) GitHub organization under which the repo should be created.
@@ -226,7 +226,6 @@ public class ProjectController {
     @PostMapping("/generate-project")
     public ResponseEntity<String> generateJHipsterProject(
             @RequestBody JdlRequest jdlRequest,
-            @RequestParam String projectPath,
             @RequestParam String githubUsername,
             @RequestParam String githubToken,
             @RequestParam(required = false) String githubOrganization,
@@ -237,6 +236,7 @@ public class ProjectController {
             @RequestHeader("Authorization") String jwt) {
 
         String newProjectPath = null;
+        Path tempRootDir = null;
         try {
             // Step 1: Log start of project generation
             logger.info("Starting project generation for baseName: {}", jdlRequest.getBaseName());
@@ -254,8 +254,9 @@ public class ProjectController {
                 return ResponseEntity.status(HttpStatus.CONFLICT).body("Project with port " + jdlRequest.getServerPort() + " already exists.");
             }
 
-            // Step 3: Create project directory
-            newProjectPath = projectPath + File.separator + appBaseName;
+            // Step 3: Create server-managed temporary project directory
+            tempRootDir = Files.createTempDirectory("acmf-monolith-");
+            newProjectPath = tempRootDir.resolve(appBaseName).toString();
             Files.createDirectories(Paths.get(newProjectPath));
 
             // Step 4: Generate JHipster project using Docker
@@ -322,7 +323,9 @@ public class ProjectController {
 
         } finally {
             // Step 13: Clean up local project directory after completion
-            if(newProjectPath != null){
+            if (tempRootDir != null) {
+                deleteProjectDirectory(tempRootDir.toFile());
+            } else if (newProjectPath != null) {
                 deleteProjectDirectory(new File(newProjectPath));
             }
         }
@@ -648,7 +651,6 @@ public class ProjectController {
     @PostMapping("/generate-microservices")
     public ResponseEntity<String> generateMicroservices(
             @Valid @RequestBody MicroserviceJdlRequest microserviceJdlRequest,
-            @RequestParam String projectPath,
             @RequestParam String githubUsername,
             @RequestParam String githubToken,
             @RequestParam(required = false) String githubOrganization,
@@ -658,11 +660,13 @@ public class ProjectController {
             @RequestParam(required = false) String region,          // AWS region
             @RequestHeader("Authorization") String jwt) {
 
-        // 0) Compute root directory for the monorepo
-        String rootDirPath = projectPath + File.separator + microserviceJdlRequest.getRootDirectoryName();
+        // 0) Compute root directory for the monorepo under a server-managed temp root
+        String rootDirPath = null;
         List<Project> savedProjects = new ArrayList<>();
 
         try {
+            Path tempRootDir = Files.createTempDirectory("acmf-microservices-");
+            rootDirPath = tempRootDir.resolve(microserviceJdlRequest.getRootDirectoryName()).toString();
             // 1) Create root directory
             Files.createDirectories(Paths.get(rootDirPath));
 

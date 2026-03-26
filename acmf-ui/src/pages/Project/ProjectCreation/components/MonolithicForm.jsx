@@ -161,7 +161,6 @@ const MonolithicForm = ({ formikProps, onNext, onBack, onPreview }) => {
         githubOrganization: values.githubOrganization,
         
         // Cloud credentials as parameters
-        projectPath: values.projectPath,
         cloudProvider: values.cloudProvider,
         cloudService: values.cloudService,
         accountId: values.accountId,
