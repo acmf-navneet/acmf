@@ -91,17 +91,17 @@ public class GithubWorkflowService {
                              chmod +x gradlew
                              # Explicitly run the webapp build before jib
                              ./gradlew -Pprod clean webapp -x test
-                             ./gradlew jibDockerBuild -Pprod -x test -x javadoc -x integrationTest
+                             ./gradlew jibDockerBuild -Pprod -x test -x javadoc -x integrationTest -Djib.to.image=%4$s:latest
                           elif [ -f "mvnw" ]; then
                              chmod +x mvnw
                              # Ensure Maven builds the production assets first
                              ./mvnw -Pprod clean package -DskipTests -Dmaven.javadoc.skip=true
                              # Then let Jib create the image from the packaged classes
-                             ./mvnw jib:dockerBuild -Pprod -DskipTests
+                             ./mvnw jib:dockerBuild -Pprod -DskipTests -Djib.to.image=%4$s:latest
                           elif [ -f "pom.xml" ]; then
                              # Fallback when Maven wrapper isn't committed
                              mvn -Pprod clean package -DskipTests -Dmaven.javadoc.skip=true
-                             mvn jib:dockerBuild -Pprod -DskipTests
+                             mvn jib:dockerBuild -Pprod -DskipTests -Djib.to.image=%4$s:latest
                           fi
                 
                       - name: Set up Docker
@@ -834,13 +834,16 @@ jobs:
             # Explicitly run the webapp build before jib
             ./gradlew -Pprod clean webapp -x test
             # UPDATED: Added -x cucumber to skip failing tests
-            ./gradlew jibDockerBuild -Pprod -x test -x javadoc -x integrationTest -x cucumber
+            ./gradlew jibDockerBuild -Pprod -x test -x javadoc -x integrationTest -x cucumber -Djib.to.image=${{ matrix.service }}:latest
           elif [ -f "mvnw" ]; then
             chmod +x mvnw
             # Ensure Maven builds the production assets first
             ./mvnw -Pprod clean package -DskipTests -Dmaven.javadoc.skip=true
             # UPDATED: Changed 'verify' to 'package' to skip integration tests
-            ./mvnw -Pprod package jib:dockerBuild -DskipTests -Dmaven.javadoc.skip=true
+            ./mvnw -Pprod package jib:dockerBuild -DskipTests -Dmaven.javadoc.skip=true -Djib.to.image=${{ matrix.service }}:latest
+          elif [ -f "pom.xml" ]; then
+            mvn -Pprod clean package -DskipTests -Dmaven.javadoc.skip=true
+            mvn -Pprod package jib:dockerBuild -DskipTests -Dmaven.javadoc.skip=true -Djib.to.image=${{ matrix.service }}:latest
           else
             echo "No build tool found"
             exit 1
