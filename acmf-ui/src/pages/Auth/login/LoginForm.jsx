@@ -13,7 +13,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useDispatch } from "react-redux";
 import { login } from "@/redux/Auth/Action";
-import PasswordRecovery from "./PasswordRecovery";
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -33,14 +32,14 @@ export default function LoginForm() {
 
   const onSubmit = async (data) => {
     try {
-      await dispatch(login(data)).then(() => {
-        navigate("/");
-      });
+      await dispatch(login(data));
+      navigate("/");
     } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        "Login failed. Please check your credentials and try again.";
+      form.setError("root", { type: "manual", message: errorMessage });
     }
-  };
-  const handleForgotPassword = () => {
-    navigate("/passwordrecovery");
   };
 
   return (
@@ -92,6 +91,11 @@ export default function LoginForm() {
             >
               Login
             </Button>
+            {form.formState.errors.root?.message ? (
+              <p className="text-sm text-red-600 text-center">
+                {form.formState.errors.root.message}
+              </p>
+            ) : null}
 
             <div className="mt-4 text-center">
               <a

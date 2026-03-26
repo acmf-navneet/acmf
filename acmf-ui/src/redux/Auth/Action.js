@@ -25,8 +25,11 @@ export const register = (userData) => async (dispatch) => {
     const user = response.data;
     if (user.jwt) localStorage.setItem("jwt", user.jwt);
     dispatch(registerSuccess(user));
+    return user;
   } catch (error) {
-    dispatch(registerFailure(error.message));
+    const message = error.response?.data?.message || error.message;
+    dispatch(registerFailure(message));
+    throw error;
   }
 };
 
@@ -41,8 +44,11 @@ export const login = (userData) => async (dispatch) => {
     const user = response.data;
     if (user.jwt) localStorage.setItem("jwt", user.jwt);
     dispatch(loginSuccess(user));
+    return user;
   } catch (error) {
-    dispatch(loginFailure(error.message));
+    const message = error.response?.data?.message || error.message;
+    dispatch(loginFailure(message));
+    throw error;
   }
 };
 
