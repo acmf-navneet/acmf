@@ -214,10 +214,22 @@ public class GithubWorkflowService {
                               PG_CONTAINER="postgres"
                             fi
 
-                            # Wait for Postgres to be ready (timeout + logs)
+                            # Wait for Postgres container + readiness (timeout + diagnostics)
                             count=0
-                            until docker exec "$PG_CONTAINER" pg_isready -U platform_admin >/dev/null 2>&1; do
-                              echo "Waiting for Postgres ($PG_CONTAINER)... ($count/60)"
+                            until [ "$(docker inspect -f '{{.State.Running}}' "$PG_CONTAINER" 2>/dev/null)" = "true" ]; do
+                              echo "Waiting for Postgres container to be running ($PG_CONTAINER)... ($count/60)"
+                              sleep 2
+                              count=$(( ${count:-0} + 1 ))
+                              if [ "${count:-0}" -ge 60 ]; then
+                                echo "Postgres container did not enter running state. Last logs:"
+                                docker logs --tail 100 "$PG_CONTAINER" || true
+                                exit 1
+                              fi
+                            done
+
+                            count=0
+                            until docker exec "$PG_CONTAINER" sh -lc 'pg_isready -U platform_admin >/dev/null 2>&1 || pg_isready -U postgres >/dev/null 2>&1 || pg_isready >/dev/null 2>&1'; do
+                              echo "Waiting for Postgres readiness ($PG_CONTAINER)... ($count/60)"
                               sleep 2
                               count=$(( ${count:-0} + 1 ))
                               if [ "${count:-0}" -ge 60 ]; then
@@ -999,15 +1011,27 @@ jobs:
                 postgres:17
             fi
             
-            # Wait for Postgres with timeout
+            # Wait for Postgres container + readiness
             count=0
-            until docker exec "$PG_CONTAINER" pg_isready -U platform_admin >/dev/null 2>&1; do
-              echo "Waiting for Postgres... ($count/30)"
+            until [ "$(docker inspect -f '{{.State.Running}}' "$PG_CONTAINER" 2>/dev/null)" = "true" ]; do
+              echo "Waiting for Postgres container to run... ($count/30)"
               sleep 2
               count=$(( ${count:-0} + 1 ))
               if [ "${count:-0}" -ge 30 ]; then
-                echo "❌ Postgres failed to start. Logs:"
-                docker logs "$PG_CONTAINER"
+                echo "❌ Postgres container did not enter running state. Logs:"
+                docker logs "$PG_CONTAINER" || true
+                exit 1
+              fi
+            done
+            
+            count=0
+            until docker exec "$PG_CONTAINER" sh -lc 'pg_isready -U platform_admin >/dev/null 2>&1 || pg_isready -U postgres >/dev/null 2>&1 || pg_isready >/dev/null 2>&1'; do
+              echo "Waiting for Postgres readiness... ($count/30)"
+              sleep 2
+              count=$(( ${count:-0} + 1 ))
+              if [ "${count:-0}" -ge 30 ]; then
+                echo "❌ Postgres failed to become ready. Logs:"
+                docker logs "$PG_CONTAINER" || true
                 exit 1
               fi
             done
