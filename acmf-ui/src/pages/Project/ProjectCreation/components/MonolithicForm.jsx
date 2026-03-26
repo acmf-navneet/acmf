@@ -20,6 +20,8 @@ const buildJdlFromEntities = (entities = []) => {
 
     (entity.fields || []).forEach((field) => {
       if (!field || !field.name || !field.type) return;
+      // JHipster manages id field automatically; don't emit it in JDL.
+      if (String(field.name).trim().toLowerCase() === "id") return;
 
       const options = [];
       if (field.required) options.push("required");

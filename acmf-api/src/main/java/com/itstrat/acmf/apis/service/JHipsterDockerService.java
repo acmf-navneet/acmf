@@ -42,7 +42,9 @@ public class JHipsterDockerService {
         String jdlContent = request.getJdlContent();
         if (jdlContent != null && !jdlContent.isBlank()) {
             writeJdlFile(appDir, jdlContent);
-            runDockerWithJdl(appDir);
+            // For monolith flow we already generated the app from .yo-rc.json.
+            // Apply partial entity/relationship JDL on top of that app.
+            runDockerImportJdl(appDir);
         }
     }
 
@@ -215,6 +217,24 @@ public class JHipsterDockerService {
                         "-v \"%s:/home/jhipster/app\" " +
                         "-w /home/jhipster/app " +
                         "jhipster/jhipster:v8.11.0 jhipster jdl " + JDL_FILENAME + " --force --skip-install --skip-git --no-insight",
+                mountPath
+        );
+        runDockerCommand(appDir, dockerCmd);
+    }
+
+    /**
+     * Imports JDL into an already generated app (monolith flow).
+     * Supports partial JDL (entity/relationship definitions) without requiring
+     * a full application block in the JDL file.
+     */
+    private void runDockerImportJdl(File appDir) throws IOException, InterruptedException {
+        String mountPath = resolveMountPath(appDir);
+        String dockerCmd = String.format(
+                "docker run --rm -i -u root " +
+                        "-v /var/run/docker.sock:/var/run/docker.sock " +
+                        "-v \"%s:/home/jhipster/app\" " +
+                        "-w /home/jhipster/app " +
+                        "jhipster/jhipster:v8.11.0 jhipster import-jdl " + JDL_FILENAME + " --force --skip-install --skip-git --no-insight",
                 mountPath
         );
         runDockerCommand(appDir, dockerCmd);
