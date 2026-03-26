@@ -248,7 +248,7 @@ public class JHipsterDockerService {
                         "-e ACMF_JDL_B64=\"%s\" " +
                         "-v \"%s:/home/jhipster/app\" " +
                         "-w /home/jhipster/app " +
-                        "jhipster/jhipster:v8.11.0 /bin/bash -lc \"echo \\\"$ACMF_JDL_B64\\\" | base64 -d > " + JDL_CONTAINER_PATH + " && jhipster jdl " + JDL_CONTAINER_PATH + " --force --skip-install --skip-git --no-insight\"",
+                        "jhipster/jhipster:v8.11.0 /bin/bash -lc \"echo \\\"\\$ACMF_JDL_B64\\\" | base64 -d > " + JDL_CONTAINER_PATH + " && jhipster jdl " + JDL_CONTAINER_PATH + " --force --skip-install --skip-git --no-insight\"",
                 jdlB64,
                 mountPath
         );
@@ -272,7 +272,7 @@ public class JHipsterDockerService {
                         "-e ACMF_JDL_B64=\"%s\" " +
                         "-v \"%s:/home/jhipster/app\" " +
                         "-w /home/jhipster/app " +
-                        "jhipster/jhipster:v8.11.0 /bin/bash -lc \"echo \\\"$ACMF_JDL_B64\\\" | base64 -d > " + JDL_CONTAINER_PATH + " && jhipster import-jdl " + JDL_CONTAINER_PATH + " --force --skip-install --skip-git --no-insight\"",
+                        "jhipster/jhipster:v8.11.0 /bin/bash -lc \"echo \\\"\\$ACMF_JDL_B64\\\" | base64 -d > " + JDL_CONTAINER_PATH + " && jhipster import-jdl " + JDL_CONTAINER_PATH + " --force --skip-install --skip-git --no-insight\"",
                 jdlB64,
                 mountPath
         );
