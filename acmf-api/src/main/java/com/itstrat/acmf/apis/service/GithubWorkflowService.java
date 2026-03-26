@@ -171,7 +171,7 @@ public class GithubWorkflowService {
                           echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/ec2-keypair.pem
                           chmod 600 ~/.ssh/ec2-keypair.pem
                           ssh-keyscan -H ${{ secrets.EC2_IP }} >> ~/.ssh/known_hosts
-                          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2-keypair.pem ubuntu@${{ secrets.EC2_IP }} <<EOF
+                          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2-keypair.pem ubuntu@${{ secrets.EC2_IP }} <<'EOF'
 
                             sudo apt-get update -y
                             sudo apt-get install -y docker.io git
