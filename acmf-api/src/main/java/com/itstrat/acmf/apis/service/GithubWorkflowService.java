@@ -191,7 +191,18 @@ public class GithubWorkflowService {
                             #docker-compose --version
                 
                             docker network inspect app-network >/dev/null 2>&1 || docker network create app-network
-                            if ! docker ps | grep -q postgres; then
+                            PG_CONTAINER=""
+                            if docker ps -a --format '{{.Names}}' | grep -q "^postgres$"; then
+                              PG_CONTAINER="postgres"
+                              if ! docker ps --format '{{.Names}}' | grep -q "^postgres$"; then
+                                docker start postgres
+                              fi
+                            elif docker ps -a --format '{{.Names}}' | grep -q "^acmf-postgres$"; then
+                              PG_CONTAINER="acmf-postgres"
+                              if ! docker ps --format '{{.Names}}' | grep -q "^acmf-postgres$"; then
+                                docker start acmf-postgres
+                              fi
+                            else
                               docker run -d \\
                                 --name postgres \\
                                 --network app-network \\
@@ -201,33 +212,41 @@ public class GithubWorkflowService {
                                 -p 5432:5432 \\
                                 -v pgdata:/var/lib/postgresql/data \\
                                 postgres:17
+                              PG_CONTAINER="postgres"
                             fi
-                
-                            # Wait for Postgres to be ready
-                            until docker exec postgres pg_isready -U platform_admin >/dev/null 2>&1; do
-                              echo "Waiting for Postgres..."
+
+                            # Wait for Postgres to be ready (timeout + logs)
+                            count=0
+                            until docker exec "$PG_CONTAINER" pg_isready -U platform_admin >/dev/null 2>&1; do
+                              echo "Waiting for Postgres ($PG_CONTAINER)... ($count/60)"
                               sleep 2
+                              count=$((count+1))
+                              if [ $count -ge 60 ]; then
+                                echo "Postgres did not become ready. Last logs:"
+                                docker logs --tail 100 "$PG_CONTAINER" || true
+                                exit 1
+                              fi
                             done
                 
-                            docker exec postgres psql -U platform_admin -d postgres -tAc \\
+                            docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -tAc \\
                             "SELECT 1 FROM pg_database WHERE datname='%4$s'" \\
-                            | grep -q 1 || docker exec postgres psql -U platform_admin -d postgres -c \\
+                            | grep -q 1 || docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \\
                             "CREATE DATABASE %4$s;"
 
                             # Create user if it does not exist
-                            docker exec postgres psql -U platform_admin -d postgres -tAc \\
+                            docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -tAc \\
                             "SELECT 1 FROM pg_roles WHERE rolname='%4$s_user'" \\
-                            | grep -q 1 || docker exec postgres psql -U platform_admin -d postgres -c \\
+                            | grep -q 1 || docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \\
                             "CREATE USER %4$s_user;"
 
-                            docker exec postgres psql -U platform_admin -d postgres -c \\
+                            docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \\
                             "ALTER USER %4$s_user WITH PASSWORD '%4$s_pass';"
 
                             # Grant privileges (safe to re-run)
-                            docker exec postgres psql -U platform_admin -d postgres -c \\
+                            docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \\
                             "GRANT ALL PRIVILEGES ON DATABASE %4$s TO %4$s_user;"
 
-                            docker exec postgres psql -U platform_admin -d %4$s -c \\
+                            docker exec "$PG_CONTAINER" psql -U platform_admin -d %4$s -c \\
                             "ALTER SCHEMA public OWNER TO %4$s_user;"
 
                             docker pull public.ecr.aws/c4d3l3m6/%4$s:latest
@@ -950,15 +969,23 @@ jobs:
             # Shared network
             docker network inspect app-network >/dev/null 2>&1 || docker network create app-network
 
+            PG_CONTAINER=""
             if docker ps -a --format '{{.Names}}' | grep -q "^postgres$"; then
-              echo "✅ Postgres container found."
-              if [ "$(docker ps -q -f name=postgres)" ]; then
+              PG_CONTAINER="postgres"
+            elif docker ps -a --format '{{.Names}}' | grep -q "^acmf-postgres$"; then
+              PG_CONTAINER="acmf-postgres"
+            fi
+            
+            if [ -n "$PG_CONTAINER" ]; then
+              echo "✅ Postgres container found: $PG_CONTAINER"
+              if [ "$(docker ps -q -f name=$PG_CONTAINER)" ]; then
                  echo "   It is already running. Skipping start."
               else
                  echo "   It is stopped. Starting it..."
-                 docker start postgres
+                 docker start "$PG_CONTAINER"
               fi
             else
+              PG_CONTAINER="postgres"
               echo "🆕 Postgres container NOT found. Creating new one..."
               # Note: We use -v pgdata:/... to ensure data persists in a volume even if container is deleted later
               docker run -d \\
@@ -974,33 +1001,33 @@ jobs:
             
             # Wait for Postgres with timeout
             count=0
-            until docker exec postgres pg_isready -U platform_admin >/dev/null 2>&1; do
+            until docker exec "$PG_CONTAINER" pg_isready -U platform_admin >/dev/null 2>&1; do
               echo "Waiting for Postgres... ($count/30)"
               sleep 2
               count=$((count+1))
               if [ $count -ge 30 ]; then
                 echo "❌ Postgres failed to start. Logs:"
-                docker logs postgres
+                docker logs "$PG_CONTAINER"
                 exit 1
               fi
             done
 
             # DB + user per service
             for SERVICE in %s; do
-              docker exec postgres psql -U platform_admin -d postgres -tAc \
+              docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -tAc \
               "SELECT 1 FROM pg_database WHERE datname='${SERVICE}'" | grep -q 1 || \
-              docker exec postgres psql -U platform_admin -d postgres -c \
+              docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \
               "CREATE DATABASE ${SERVICE};"
 
-              docker exec postgres psql -U platform_admin -d postgres -tAc \
+              docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -tAc \
               "SELECT 1 FROM pg_roles WHERE rolname='${SERVICE}_user'" | grep -q 1 || \
-              docker exec postgres psql -U platform_admin -d postgres -c \
+              docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \
               "CREATE USER ${SERVICE}_user WITH PASSWORD '${SERVICE}_pass';"
 
-              docker exec postgres psql -U platform_admin -d postgres -c \
+              docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \
               "GRANT ALL PRIVILEGES ON DATABASE ${SERVICE} TO ${SERVICE}_user;"
 
-              docker exec postgres psql -U platform_admin -d ${SERVICE} -c \
+              docker exec "$PG_CONTAINER" psql -U platform_admin -d ${SERVICE} -c \
               "ALTER SCHEMA public OWNER TO ${SERVICE}_user;"
             done
 
