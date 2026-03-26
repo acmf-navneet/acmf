@@ -102,7 +102,16 @@ public class GithubWorkflowService {
                              # Fallback when Maven wrapper isn't committed
                              mvn -Pprod clean package -DskipTests -Dmaven.javadoc.skip=true
                              mvn jib:dockerBuild -Pprod -DskipTests -Djib.to.image=%4$s:latest
+                          else
+                             echo "No supported build files found (gradlew/mvnw/pom.xml)"
+                             exit 1
                           fi
+                          
+                          docker image inspect %4$s:latest >/dev/null 2>&1 || {
+                            echo "Expected image %4$s:latest not found after build"
+                            docker images
+                            exit 1
+                          }
                 
                       - name: Set up Docker
                         uses: docker/setup-buildx-action@v2
@@ -872,6 +881,11 @@ jobs:
 
       - name: Tag & Push Docker Image
         run: |
+          docker image inspect ${{ matrix.service }}:latest >/dev/null 2>&1 || {
+            echo "Expected image ${{ matrix.service }}:latest not found after build"
+            docker images
+            exit 1
+          }
           docker tag ${{ matrix.service }}:latest public.ecr.aws/c4d3l3m6/${{ matrix.service }}:latest
           docker push public.ecr.aws/c4d3l3m6/${{ matrix.service }}:latest
 
