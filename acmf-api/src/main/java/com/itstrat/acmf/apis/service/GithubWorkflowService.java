@@ -168,14 +168,10 @@ public class GithubWorkflowService {
                       - name: SSH into EC2 and Deploy Docker Image
                         run: |
                           mkdir -p ~/.ssh
-                          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/ec2-keypair.pem
+                          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/ec2-keypair.pem
                           chmod 600 ~/.ssh/ec2-keypair.pem
                           ssh-keyscan -H ${{ secrets.EC2_IP }} >> ~/.ssh/known_hosts
-                          SSH_USER="${{ secrets.EC2_SSH_USER }}"
-                          if [ -z "$SSH_USER" ]; then
-                            SSH_USER="ubuntu"
-                          fi
-                          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2-keypair.pem "$SSH_USER@${{ secrets.EC2_IP }}" <<EOF
+                          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2-keypair.pem ubuntu@${{ secrets.EC2_IP }} <<EOF
 
                             sudo dnf update -y
                             sudo dnf install -y docker git
@@ -916,17 +912,13 @@ jobs:
       - name: SSH into EC2 & deploy
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/ec2-keypair.pem
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/ec2-keypair.pem
           chmod 600 ~/.ssh/ec2-keypair.pem
           ssh-keyscan -H ${{ secrets.EC2_IP }} >> ~/.ssh/known_hosts
-          SSH_USER="${{ secrets.EC2_SSH_USER }}"
-          if [ -z "$SSH_USER" ]; then
-            SSH_USER="ubuntu"
-          fi
 
           ssh -o StrictHostKeyChecking=no \
               -i ~/.ssh/ec2-keypair.pem \
-              "$SSH_USER@${{ secrets.EC2_IP }}" <<'EOF'
+              ubuntu@${{ secrets.EC2_IP }} <<'EOF'
             set -e
 
             # Docker (Amazon Linux 2023)
