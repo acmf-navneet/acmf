@@ -12,7 +12,9 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
+import java.util.Base64;
 import java.util.Deque;
 import java.util.UUID;
 
@@ -57,7 +59,7 @@ public class JHipsterDockerService {
             // For monolith flow we already generated the app from .yo-rc.json.
             // Apply partial entity/relationship JDL on top of that app.
             logger.info("[{}] Importing JDL into generated app", requestId);
-            runDockerImportJdl(appDir, requestId);
+            runDockerImportJdl(appDir, requestId, jdlContent);
         } else {
             logger.info("[{}] No jdlContent provided, skipping JDL import", requestId);
         }
@@ -89,7 +91,7 @@ public class JHipsterDockerService {
             logger.info("[{}] jdlContent detected ({} chars), writing app.jdl", requestId, jdlContent.length());
             writeJdlFile(appDir, jdlContent);
             logger.info("[{}] Running JHipster full JDL generation", requestId);
-            runDockerWithJdl(appDir, requestId);
+            runDockerWithJdl(appDir, requestId, jdlContent);
         } else {
             logger.info("[{}] Writing .yo-rc.json", requestId);
             writeYoRc(appDir, request);
@@ -234,17 +236,20 @@ public class JHipsterDockerService {
      * Runs JHipster in Docker using the JDL file (app + entities) instead of .yo-rc.json.
      * Uses the same volume-mount and host-path logic as {@link #runDocker(File)}.
      */
-    private void runDockerWithJdl(File appDir, String requestId) throws IOException, InterruptedException {
+    private void runDockerWithJdl(File appDir, String requestId, String jdlContent) throws IOException, InterruptedException {
         String mountPath = resolveMountPath(appDir);
         File jdlFile = new File(appDir, JDL_FILENAME);
         logger.info("[{}][jhipster-jdl] JDL file check. exists={}, sizeBytes={}, path={}",
                 requestId, jdlFile.exists(), jdlFile.exists() ? jdlFile.length() : 0, jdlFile.getAbsolutePath());
+        String jdlB64 = Base64.getEncoder().encodeToString(jdlContent.getBytes(StandardCharsets.UTF_8));
         String dockerCmd = String.format(
                 "docker run --rm -i -u root " +
                         "-v /var/run/docker.sock:/var/run/docker.sock " +
+                        "-e ACMF_JDL_B64=\"%s\" " +
                         "-v \"%s:/home/jhipster/app\" " +
                         "-w /home/jhipster/app " +
-                        "jhipster/jhipster:v8.11.0 jhipster jdl " + JDL_CONTAINER_PATH + " --force --skip-install --skip-git --no-insight",
+                        "jhipster/jhipster:v8.11.0 /bin/bash -lc \"echo \\\"$ACMF_JDL_B64\\\" | base64 -d > " + JDL_CONTAINER_PATH + " && jhipster jdl " + JDL_CONTAINER_PATH + " --force --skip-install --skip-git --no-insight\"",
+                jdlB64,
                 mountPath
         );
         runDockerCommand(appDir, dockerCmd, requestId, "jhipster-jdl");
@@ -255,17 +260,20 @@ public class JHipsterDockerService {
      * Supports partial JDL (entity/relationship definitions) without requiring
      * a full application block in the JDL file.
      */
-    private void runDockerImportJdl(File appDir, String requestId) throws IOException, InterruptedException {
+    private void runDockerImportJdl(File appDir, String requestId, String jdlContent) throws IOException, InterruptedException {
         String mountPath = resolveMountPath(appDir);
         File jdlFile = new File(appDir, JDL_FILENAME);
         logger.info("[{}][jhipster-import-jdl] JDL file check. exists={}, sizeBytes={}, path={}",
                 requestId, jdlFile.exists(), jdlFile.exists() ? jdlFile.length() : 0, jdlFile.getAbsolutePath());
+        String jdlB64 = Base64.getEncoder().encodeToString(jdlContent.getBytes(StandardCharsets.UTF_8));
         String dockerCmd = String.format(
                 "docker run --rm -i -u root " +
                         "-v /var/run/docker.sock:/var/run/docker.sock " +
+                        "-e ACMF_JDL_B64=\"%s\" " +
                         "-v \"%s:/home/jhipster/app\" " +
                         "-w /home/jhipster/app " +
-                        "jhipster/jhipster:v8.11.0 jhipster import-jdl " + JDL_CONTAINER_PATH + " --force --skip-install --skip-git --no-insight",
+                        "jhipster/jhipster:v8.11.0 /bin/bash -lc \"echo \\\"$ACMF_JDL_B64\\\" | base64 -d > " + JDL_CONTAINER_PATH + " && jhipster import-jdl " + JDL_CONTAINER_PATH + " --force --skip-install --skip-git --no-insight\"",
+                jdlB64,
                 mountPath
         );
         runDockerCommand(appDir, dockerCmd, requestId, "jhipster-import-jdl");
