@@ -173,12 +173,11 @@ public class GithubWorkflowService {
                           ssh-keyscan -H ${{ secrets.EC2_IP }} >> ~/.ssh/known_hosts
                           ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2-keypair.pem ubuntu@${{ secrets.EC2_IP }} <<EOF
 
-                            sudo dnf update -y
-                            sudo dnf install -y docker git
+                            sudo apt-get update -y
+                            sudo apt-get install -y docker.io git
                             sudo systemctl start docker
                             sudo systemctl enable docker
-                            sudo usermod -aG docker ec2-user
-                            newgrp docker
+                            sudo usermod -aG docker ubuntu
 
                             if ! command -v aws &> /dev/null; then
                               sudo apt install -y awscli
@@ -220,8 +219,8 @@ public class GithubWorkflowService {
                             until docker exec "$PG_CONTAINER" pg_isready -U platform_admin >/dev/null 2>&1; do
                               echo "Waiting for Postgres ($PG_CONTAINER)... ($count/60)"
                               sleep 2
-                              count=$((count+1))
-                              if [ $count -ge 60 ]; then
+                              count=$(( ${count:-0} + 1 ))
+                              if [ "${count:-0}" -ge 60 ]; then
                                 echo "Postgres did not become ready. Last logs:"
                                 docker logs --tail 100 "$PG_CONTAINER" || true
                                 exit 1
@@ -941,9 +940,10 @@ jobs:
             set -e
 
             # Docker (Amazon Linux 2023)
-            sudo dnf install -y docker || true
+            sudo apt-get update -y
+            sudo apt-get install -y docker.io || true
             sudo systemctl enable --now docker
-            sudo usermod -aG docker ec2-user || true
+            sudo usermod -aG docker ubuntu || true
 
             # Docker Compose v2
             if ! docker compose version >/dev/null 2>&1; then
@@ -1004,8 +1004,8 @@ jobs:
             until docker exec "$PG_CONTAINER" pg_isready -U platform_admin >/dev/null 2>&1; do
               echo "Waiting for Postgres... ($count/30)"
               sleep 2
-              count=$((count+1))
-              if [ $count -ge 30 ]; then
+              count=$(( ${count:-0} + 1 ))
+              if [ "${count:-0}" -ge 30 ]; then
                 echo "❌ Postgres failed to start. Logs:"
                 docker logs "$PG_CONTAINER"
                 exit 1
