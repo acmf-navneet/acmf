@@ -214,6 +214,9 @@ public class GithubWorkflowService {
                               PG_CONTAINER="postgres"
                             fi
 
+                            # Ensure DB container is reachable on app-network as host "postgres"
+                            docker network connect --alias postgres app-network "$PG_CONTAINER" >/dev/null 2>&1 || true
+
                             # Wait for Postgres container + readiness (timeout + diagnostics)
                             count=0
                             until [ "$(docker inspect -f '{{.State.Running}}' "$PG_CONTAINER" 2>/dev/null)" = "true" ]; do
@@ -1011,6 +1014,9 @@ jobs:
                 postgres:17
             fi
             
+            # Ensure DB container is reachable on app-network as host "postgres"
+            docker network connect --alias postgres app-network "$PG_CONTAINER" >/dev/null 2>&1 || true
+
             # Wait for Postgres container + readiness
             count=0
             until [ "$(docker inspect -f '{{.State.Running}}' "$PG_CONTAINER" 2>/dev/null)" = "true" ]; do
