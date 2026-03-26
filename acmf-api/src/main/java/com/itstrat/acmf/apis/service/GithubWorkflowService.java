@@ -129,12 +129,18 @@ public class GithubWorkflowService {
                 
                       - name: Ensure ECR Public repository exists
                         run: |
-                          aws ecr-public describe-repositories \\
-                            --repository-names %4$s \\
-                            --region us-east-1 \\
-                          || aws ecr-public create-repository \\
-                            --repository-name %4$s \\
-                            --region us-east-1
+                          set -euo pipefail
+                          REPO_NAME="%4$s"
+                          if aws ecr-public describe-repositories \
+                            --repository-names "$REPO_NAME" \
+                            --region us-east-1 >/dev/null 2>&1; then
+                            echo "ECR Public repository already exists: $REPO_NAME"
+                          else
+                            echo "Creating ECR Public repository: $REPO_NAME"
+                            aws ecr-public create-repository \
+                              --repository-name "$REPO_NAME" \
+                              --region us-east-1 >/dev/null
+                          fi
 
                       - name: Build and Push Docker Image
                         env:
@@ -872,12 +878,18 @@ jobs:
 
       - name: Ensure ECR Public repository exists
         run: |
-          aws ecr-public describe-repositories \
-            --repository-names ${{ matrix.service }} \
-            --region us-east-1 \
-          || aws ecr-public create-repository \
-            --repository-name ${{ matrix.service }} \
-            --region us-east-1
+          set -euo pipefail
+          REPO_NAME="${{ matrix.service }}"
+          if aws ecr-public describe-repositories \
+            --repository-names "$REPO_NAME" \
+            --region us-east-1 >/dev/null 2>&1; then
+            echo "ECR Public repository already exists: $REPO_NAME"
+          else
+            echo "Creating ECR Public repository: $REPO_NAME"
+            aws ecr-public create-repository \
+              --repository-name "$REPO_NAME" \
+              --region us-east-1 >/dev/null
+          fi
 
       - name: Tag & Push Docker Image
         run: |
