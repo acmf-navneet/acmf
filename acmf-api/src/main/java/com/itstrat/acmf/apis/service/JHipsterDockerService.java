@@ -4,15 +4,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.itstrat.acmf.apis.entity.JdlRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.UUID;
 
 @Service
 public class JHipsterDockerService {
+    private static final Logger logger = LoggerFactory.getLogger(JHipsterDockerService.class);
 
     /**
      * Generates a JHipster Monolith project using Docker.
@@ -31,21 +37,31 @@ public class JHipsterDockerService {
      */
     public void generateMonolithProjectViaDocker(JdlRequest request, String projectPath) throws IOException, InterruptedException {
         File appDir = new File(projectPath);
+        long start = System.currentTimeMillis();
+        String requestId = UUID.randomUUID().toString().substring(0, 8);
+        logger.info("[{}] Monolith generation started. baseName={}, appDir={}", requestId, request.getBaseName(), appDir.getAbsolutePath());
 
         // Always generate the base application from the structured configuration
         // in JdlRequest (mapped from the monolith form).
+        logger.info("[{}] Writing .yo-rc.json", requestId);
         writeYoRc(appDir, request);
-        runDocker(appDir); // scaffolds the monolith based on .yo-rc.json
+        logger.info("[{}] Running JHipster base generation", requestId);
+        runDocker(appDir, requestId); // scaffolds the monolith based on .yo-rc.json
 
         // If optional JDL content is provided, treat it as additional domain
         // model (entities/relationships) and apply it on top of the generated app.
         String jdlContent = request.getJdlContent();
         if (jdlContent != null && !jdlContent.isBlank()) {
+            logger.info("[{}] jdlContent detected ({} chars), writing app.jdl", requestId, jdlContent.length());
             writeJdlFile(appDir, jdlContent);
             // For monolith flow we already generated the app from .yo-rc.json.
             // Apply partial entity/relationship JDL on top of that app.
-            runDockerImportJdl(appDir);
+            logger.info("[{}] Importing JDL into generated app", requestId);
+            runDockerImportJdl(appDir, requestId);
+        } else {
+            logger.info("[{}] No jdlContent provided, skipping JDL import", requestId);
         }
+        logger.info("[{}] Monolith generation finished in {} ms", requestId, System.currentTimeMillis() - start);
     }
 
     /**
@@ -65,14 +81,22 @@ public class JHipsterDockerService {
      */
     public void generateMicroserviceProjectViaDocker(JdlRequest request, String projectPath) throws IOException, InterruptedException {
         File appDir = new File(projectPath);
+        long start = System.currentTimeMillis();
+        String requestId = UUID.randomUUID().toString().substring(0, 8);
+        logger.info("[{}] Microservice generation started. baseName={}, appDir={}", requestId, request.getBaseName(), appDir.getAbsolutePath());
         String jdlContent = request.getJdlContent();
         if (jdlContent != null && !jdlContent.isBlank()) {
+            logger.info("[{}] jdlContent detected ({} chars), writing app.jdl", requestId, jdlContent.length());
             writeJdlFile(appDir, jdlContent);
-            runDockerWithJdl(appDir);
+            logger.info("[{}] Running JHipster full JDL generation", requestId);
+            runDockerWithJdl(appDir, requestId);
         } else {
+            logger.info("[{}] Writing .yo-rc.json", requestId);
             writeYoRc(appDir, request);
-            runDocker(appDir);
+            logger.info("[{}] Running JHipster base generation", requestId);
+            runDocker(appDir, requestId);
         }
+        logger.info("[{}] Microservice generation finished in {} ms", requestId, System.currentTimeMillis() - start);
     }
 
 
@@ -209,7 +233,7 @@ public class JHipsterDockerService {
      * Runs JHipster in Docker using the JDL file (app + entities) instead of .yo-rc.json.
      * Uses the same volume-mount and host-path logic as {@link #runDocker(File)}.
      */
-    private void runDockerWithJdl(File appDir) throws IOException, InterruptedException {
+    private void runDockerWithJdl(File appDir, String requestId) throws IOException, InterruptedException {
         String mountPath = resolveMountPath(appDir);
         String dockerCmd = String.format(
                 "docker run --rm -i -u root " +
@@ -219,7 +243,7 @@ public class JHipsterDockerService {
                         "jhipster/jhipster:v8.11.0 jhipster jdl " + JDL_FILENAME + " --force --skip-install --skip-git --no-insight",
                 mountPath
         );
-        runDockerCommand(appDir, dockerCmd);
+        runDockerCommand(appDir, dockerCmd, requestId, "jhipster-jdl");
     }
 
     /**
@@ -227,7 +251,7 @@ public class JHipsterDockerService {
      * Supports partial JDL (entity/relationship definitions) without requiring
      * a full application block in the JDL file.
      */
-    private void runDockerImportJdl(File appDir) throws IOException, InterruptedException {
+    private void runDockerImportJdl(File appDir, String requestId) throws IOException, InterruptedException {
         String mountPath = resolveMountPath(appDir);
         String dockerCmd = String.format(
                 "docker run --rm -i -u root " +
@@ -237,7 +261,7 @@ public class JHipsterDockerService {
                         "jhipster/jhipster:v8.11.0 jhipster import-jdl " + JDL_FILENAME + " --force --skip-install --skip-git --no-insight",
                 mountPath
         );
-        runDockerCommand(appDir, dockerCmd);
+        runDockerCommand(appDir, dockerCmd, requestId, "jhipster-import-jdl");
     }
 
     /**
@@ -390,8 +414,9 @@ public class JHipsterDockerService {
         return (hostRootPath + relativePath).replace("\\", "/");
     }
 
-    private void runDockerCommand(File appDir, String dockerCmd) throws IOException, InterruptedException {
-        System.out.println("Executing Docker Command: " + dockerCmd);
+    private void runDockerCommand(File appDir, String dockerCmd, String requestId, String phase) throws IOException, InterruptedException {
+        logger.info("[{}][{}] Executing Docker command in {}: {}", requestId, phase, appDir.getAbsolutePath(), dockerCmd);
+        long start = System.currentTimeMillis();
         String os = System.getProperty("os.name").toLowerCase();
         ProcessBuilder pb = os.contains("win")
                 ? new ProcessBuilder("cmd.exe", "/c", dockerCmd)
@@ -401,19 +426,31 @@ public class JHipsterDockerService {
             throw new RuntimeException("Docker is not installed or not in PATH. Please install Docker and try again.");
         }
         Process process = pb.start();
+        Deque<String> lastLines = new ArrayDeque<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println("[Docker] " + line);
+                logger.info("[{}][{}][Docker] {}", requestId, phase, line);
+                if (lastLines.size() >= 20) {
+                    lastLines.removeFirst();
+                }
+                lastLines.addLast(line);
             }
         }
         int exitCode = process.waitFor();
+        long elapsed = System.currentTimeMillis() - start;
+        logger.info("[{}][{}] Docker command finished with exitCode={} in {} ms", requestId, phase, exitCode, elapsed);
         if (exitCode != 0) {
-            throw new RuntimeException("JHipster Docker generation failed for: " + appDir.getAbsolutePath());
+            StringBuilder tail = new StringBuilder();
+            for (String l : lastLines) {
+                tail.append(l).append(System.lineSeparator());
+            }
+            logger.error("[{}][{}] Docker command failed. Last output lines:\n{}", requestId, phase, tail);
+            throw new RuntimeException("JHipster Docker generation failed during " + phase + " for: " + appDir.getAbsolutePath());
         }
     }
 
-    private void runDocker(File appDir) throws IOException, InterruptedException {
+    private void runDocker(File appDir, String requestId) throws IOException, InterruptedException {
         String mountPath = resolveMountPath(appDir);
         String dockerCmd = String.format(
                 "docker run --rm -i -u root " +
@@ -423,7 +460,7 @@ public class JHipsterDockerService {
                         "jhipster/jhipster:v8.11.0 jhipster --force --skip-install --skip-git --no-insight --defaults",
                 mountPath
         );
-        runDockerCommand(appDir, dockerCmd);
+        runDockerCommand(appDir, dockerCmd, requestId, "jhipster-base");
     }
 
     /**
