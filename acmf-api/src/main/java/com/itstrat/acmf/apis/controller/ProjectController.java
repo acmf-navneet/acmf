@@ -37,6 +37,7 @@ import java.util.zip.ZipInputStream;
 public class ProjectController {
 
     private static final Logger logger = LoggerFactory.getLogger(ProjectController.class);
+    private static final String DEFAULT_INTERNAL_ROOT_PATH = "/app/generated-projects";
 
     @Autowired
     private ProjectService projectService;
@@ -254,8 +255,9 @@ public class ProjectController {
                 return ResponseEntity.status(HttpStatus.CONFLICT).body("Project with port " + jdlRequest.getServerPort() + " already exists.");
             }
 
-            // Step 3: Create server-managed temporary project directory
-            tempRootDir = Files.createTempDirectory("acmf-monolith-");
+            // Step 3: Create server-managed temporary project directory.
+            // Use an internal base path when available so Docker-on-Docker path mapping stays consistent.
+            tempRootDir = createManagedTempDirectory("acmf-monolith-");
             newProjectPath = tempRootDir.resolve(appBaseName).toString();
             Files.createDirectories(Paths.get(newProjectPath));
 
@@ -665,7 +667,7 @@ public class ProjectController {
         List<Project> savedProjects = new ArrayList<>();
 
         try {
-            Path tempRootDir = Files.createTempDirectory("acmf-microservices-");
+            Path tempRootDir = createManagedTempDirectory("acmf-microservices-");
             rootDirPath = tempRootDir.resolve(microserviceJdlRequest.getRootDirectoryName()).toString();
             // 1) Create root directory
             Files.createDirectories(Paths.get(rootDirPath));
@@ -788,6 +790,20 @@ public class ProjectController {
             tags.add(app.getClientFramework());
         }
         return tags;
+    }
+
+    private Path createManagedTempDirectory(String prefix) throws IOException {
+        String configuredRoot = System.getenv("INTERNAL_ROOT_PATH");
+        String internalRoot = (configuredRoot == null || configuredRoot.isBlank())
+                ? DEFAULT_INTERNAL_ROOT_PATH
+                : configuredRoot;
+        Path basePath = Paths.get(internalRoot);
+        Path parent = basePath.getParent();
+        if (Files.exists(basePath) || (parent != null && Files.isDirectory(parent))) {
+            Files.createDirectories(basePath);
+            return Files.createTempDirectory(basePath, prefix);
+        }
+        return Files.createTempDirectory(prefix);
     }
 
 

@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 public class DeploymentService {
 
     private static final Logger LOGGER = Logger.getLogger(DeploymentService.class.getName());
+    private static final String DEFAULT_INTERNAL_ROOT_PATH = "/app/generated-projects";
 
     public static void applicationDeployment(String appName, String newProjectPath, String cloudProvider, String cloudService , String awsAccountId , String region , String githubOrg, String applicationType) {
 
@@ -75,11 +76,7 @@ public class DeploymentService {
 //                    new File(newProjectPath).getAbsolutePath()
 //            );
 
-            String hostRootPath = System.getenv("HOST_ROOT_PATH");
-            String projectFolder = new File(newProjectPath).getName(); // e.g., "test1"
-            String mountPath = (hostRootPath != null && !hostRootPath.isEmpty())
-                    ? hostRootPath + "/" + projectFolder
-                    : new File(newProjectPath).getAbsolutePath();
+            String mountPath = resolveMountPath(newProjectPath);
 
             String dockerCmd = String.format(
                     "docker run --rm -i " +
@@ -269,17 +266,7 @@ public static void createKubernetesDirectory(String newProjectPath, String appNa
         LOGGER.info(".yo-rc.json file created at: " + yoRcFilePath.toString());
 
         // 2. Calculate the Host Path for correct Volume Mounting
-        String hostRootPath = System.getenv("HOST_ROOT_PATH");
-        String projectFolder = new File(newProjectPath).getName(); // e.g. "test1"
-        String mountPath;
-
-        if (hostRootPath != null && !hostRootPath.isEmpty()) {
-            // EC2 Environment: Use the Host path + project name + kubernetes folder
-            mountPath = hostRootPath + "/" + projectFolder + "/kubernetes";
-        } else {
-            // Local Environment: Use absolute path
-            mountPath = kubernetesPath.toAbsolutePath().toString().replace("\\", "/");
-        }
+        String mountPath = resolveMountPath(kubernetesPath.toAbsolutePath().toString());
 
         // 3. Construct Docker Command
         // -v mounts the host path to the container path
@@ -582,6 +569,27 @@ public static void createKubernetesDirectory(String newProjectPath, String appNa
         } else {
             return new ProcessBuilder("/bin/bash", "-c", command);
         }
+    }
+
+    private static String resolveMountPath(String internalPath) {
+        String hostRootPath = System.getenv("HOST_ROOT_PATH");
+        if (hostRootPath == null || hostRootPath.isBlank()) {
+            return new File(internalPath).getAbsolutePath().replace("\\", "/");
+        }
+        String configuredInternalRoot = System.getenv("INTERNAL_ROOT_PATH");
+        String internalRootPath = (configuredInternalRoot == null || configuredInternalRoot.isBlank())
+                ? DEFAULT_INTERNAL_ROOT_PATH
+                : configuredInternalRoot;
+
+        Path internalRoot = Paths.get(internalRootPath).toAbsolutePath().normalize();
+        Path absoluteInternalPath = Paths.get(internalPath).toAbsolutePath().normalize();
+        if (!absoluteInternalPath.startsWith(internalRoot)) {
+            LOGGER.warning("Path " + absoluteInternalPath + " is outside INTERNAL_ROOT_PATH " + internalRoot
+                    + ". Falling back to legacy mount mapping.");
+            return (hostRootPath + "/" + absoluteInternalPath.getFileName()).replace("\\", "/");
+        }
+        Path relative = internalRoot.relativize(absoluteInternalPath);
+        return Paths.get(hostRootPath, relative.toString()).toString().replace("\\", "/");
     }
 }
 

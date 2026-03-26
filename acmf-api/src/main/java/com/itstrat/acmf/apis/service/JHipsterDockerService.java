@@ -21,6 +21,7 @@ import java.util.UUID;
 @Service
 public class JHipsterDockerService {
     private static final Logger logger = LoggerFactory.getLogger(JHipsterDockerService.class);
+    private static final String DEFAULT_INTERNAL_ROOT_PATH = "/app/generated-projects";
 
     /**
      * Generates a JHipster Monolith project using Docker.
@@ -414,19 +415,20 @@ public class JHipsterDockerService {
         if (hostRootPath == null || hostRootPath.isEmpty()) {
             return appDir.getAbsolutePath().replace("\\", "/");
         }
-        String internalPath = appDir.getAbsolutePath();
-        String splitMarker = "generated-projects";
-        int index = internalPath.indexOf(splitMarker);
-        String relativePath = index != -1
-                ? internalPath.substring(index + splitMarker.length())
-                : "/" + appDir.getName();
-        if (!hostRootPath.endsWith("/")) {
-            hostRootPath += "/";
+        String configuredInternalRoot = System.getenv("INTERNAL_ROOT_PATH");
+        String internalRootPath = (configuredInternalRoot == null || configuredInternalRoot.isBlank())
+                ? DEFAULT_INTERNAL_ROOT_PATH
+                : configuredInternalRoot;
+
+        java.nio.file.Path internalRoot = java.nio.file.Paths.get(internalRootPath).toAbsolutePath().normalize();
+        java.nio.file.Path internalAppPath = appDir.toPath().toAbsolutePath().normalize();
+        if (!internalAppPath.startsWith(internalRoot)) {
+            logger.warn("Path {} is outside INTERNAL_ROOT_PATH {}. Falling back to legacy mount mapping.",
+                    internalAppPath, internalRoot);
+            return (hostRootPath + "/" + appDir.getName()).replace("\\", "/");
         }
-        if (relativePath.startsWith("/") || relativePath.startsWith("\\")) {
-            relativePath = relativePath.substring(1);
-        }
-        return (hostRootPath + relativePath).replace("\\", "/");
+        java.nio.file.Path relativePath = internalRoot.relativize(internalAppPath);
+        return java.nio.file.Paths.get(hostRootPath, relativePath.toString()).toString().replace("\\", "/");
     }
 
     private void runDockerCommand(File appDir, String dockerCmd, String requestId, String phase) throws IOException, InterruptedException {
