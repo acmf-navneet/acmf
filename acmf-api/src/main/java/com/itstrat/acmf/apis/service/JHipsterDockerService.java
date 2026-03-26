@@ -216,6 +216,7 @@ public class JHipsterDockerService {
 
     /** Default JDL filename used when generating from full JDL (application + entities). */
     private static final String JDL_FILENAME = "app.jdl";
+    private static final String JDL_CONTAINER_PATH = "/home/jhipster/app/" + JDL_FILENAME;
 
     /**
      * Writes the full JDL content (application + entities + relationships) to a file
@@ -235,12 +236,15 @@ public class JHipsterDockerService {
      */
     private void runDockerWithJdl(File appDir, String requestId) throws IOException, InterruptedException {
         String mountPath = resolveMountPath(appDir);
+        File jdlFile = new File(appDir, JDL_FILENAME);
+        logger.info("[{}][jhipster-jdl] JDL file check. exists={}, sizeBytes={}, path={}",
+                requestId, jdlFile.exists(), jdlFile.exists() ? jdlFile.length() : 0, jdlFile.getAbsolutePath());
         String dockerCmd = String.format(
                 "docker run --rm -i -u root " +
                         "-v /var/run/docker.sock:/var/run/docker.sock " +
                         "-v \"%s:/home/jhipster/app\" " +
                         "-w /home/jhipster/app " +
-                        "jhipster/jhipster:v8.11.0 jhipster jdl " + JDL_FILENAME + " --force --skip-install --skip-git --no-insight",
+                        "jhipster/jhipster:v8.11.0 jhipster jdl " + JDL_CONTAINER_PATH + " --force --skip-install --skip-git --no-insight",
                 mountPath
         );
         runDockerCommand(appDir, dockerCmd, requestId, "jhipster-jdl");
@@ -253,12 +257,15 @@ public class JHipsterDockerService {
      */
     private void runDockerImportJdl(File appDir, String requestId) throws IOException, InterruptedException {
         String mountPath = resolveMountPath(appDir);
+        File jdlFile = new File(appDir, JDL_FILENAME);
+        logger.info("[{}][jhipster-import-jdl] JDL file check. exists={}, sizeBytes={}, path={}",
+                requestId, jdlFile.exists(), jdlFile.exists() ? jdlFile.length() : 0, jdlFile.getAbsolutePath());
         String dockerCmd = String.format(
                 "docker run --rm -i -u root " +
                         "-v /var/run/docker.sock:/var/run/docker.sock " +
                         "-v \"%s:/home/jhipster/app\" " +
                         "-w /home/jhipster/app " +
-                        "jhipster/jhipster:v8.11.0 jhipster import-jdl " + JDL_FILENAME + " --force --skip-install --skip-git --no-insight",
+                        "jhipster/jhipster:v8.11.0 jhipster import-jdl " + JDL_CONTAINER_PATH + " --force --skip-install --skip-git --no-insight",
                 mountPath
         );
         runDockerCommand(appDir, dockerCmd, requestId, "jhipster-import-jdl");
