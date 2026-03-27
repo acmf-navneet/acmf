@@ -78,10 +78,12 @@ public class DeploymentService {
 
             String mountPath = resolveMountPath(newProjectPath);
 
+            // Run as root so the generator can read/write .yo-rc.json and generated files on the host mount
+            // (same pattern as JHipsterDockerService; otherwise EACCES on .yo-rc.json is common).
             String dockerCmd = String.format(
-                    "docker run --rm -i " +
+                    "docker run --rm -i -u root " +
                             "-v /var/run/docker.sock:/var/run/docker.sock " +
-                            "-v \"%s:/home/jhipster/app\" " + // Use calculated Mount Path
+                            "-v \"%s:/home/jhipster/app\" " +
                             "-w /home/jhipster/app " +
                             "jhipster/jhipster:v8.11.0 jhipster docker-compose --skip-checks",
                     mountPath
@@ -272,7 +274,7 @@ public static void createKubernetesDirectory(String newProjectPath, String appNa
         // -v mounts the host path to the container path
         // --skip-checks avoids the "Docker version" error you saw earlier
         String dockerCmd = String.format(
-                "docker run --rm -i " +
+                "docker run --rm -i -u root " +
                         "-v /var/run/docker.sock:/var/run/docker.sock " +
                         "-v \"%s:/home/jhipster/app\" " +
                         "-w /home/jhipster/app " +
