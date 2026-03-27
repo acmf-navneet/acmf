@@ -31,15 +31,16 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       FRONTEND_URLS: ${FRONTEND_URLS}
       # Keep container path and host path mapping explicit for Docker-in-Docker generation.
+      # Override HOST_ROOT_PATH in .env.ec2 (e.g. $HOME/acmf-generated-projects on Mac).
       INTERNAL_ROOT_PATH: /app/generated-projects
-      HOST_ROOT_PATH: /home/ubuntu/generated-projects
+      HOST_ROOT_PATH: ${HOST_ROOT_PATH:-/home/ubuntu/generated-projects}
     expose:
       - "8081"
     # The API generates JHipster projects by invoking `docker run`.
     # Mount the host Docker socket so the API container can talk to the host daemon.
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /home/ubuntu/generated-projects:/app/generated-projects
+      - ${HOST_ROOT_PATH:-/home/ubuntu/generated-projects}:/app/generated-projects
 
   ui:
     build:

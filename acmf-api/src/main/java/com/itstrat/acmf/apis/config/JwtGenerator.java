@@ -34,12 +34,24 @@ public class JwtGenerator{
     }
 
     public static String getEmailFromJwtToken(String jwt) {
-
-        jwt=jwt.substring(7);
-        Claims claims= Jwts.parserBuilder().setSigningKey(key).build()
-                .parseClaimsJws(jwt).getBody();
-        return String.valueOf(claims.get("email"));
-
+        if (jwt == null || jwt.isBlank()) {
+            throw new IllegalArgumentException("Authorization token is missing");
+        }
+        String token = jwt.trim();
+        if (token.length() > 7 && token.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            token = token.substring(7).trim();
+        }
+        Claims claims = Jwts.parserBuilder().setSigningKey(key).build()
+                .parseClaimsJws(token).getBody();
+        Object emailClaim = claims.get("email");
+        if (emailClaim == null) {
+            throw new IllegalArgumentException("JWT has no email claim");
+        }
+        String email = String.valueOf(emailClaim).trim();
+        if (email.isEmpty() || "null".equalsIgnoreCase(email)) {
+            throw new IllegalArgumentException("JWT email claim is empty");
+        }
+        return email;
     }
 
 

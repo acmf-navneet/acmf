@@ -26,10 +26,16 @@ variable "key_name" {
   description = "Existing EC2 Key Pair name to enable SSH"
 }
 
-variable "allowed_ssh_cidr" {
+variable "public_inbound_cidr" {
   type        = string
-  description = "CIDR block allowed to SSH to the instance"
+  description = "IPv4 CIDR allowed for all inbound traffic to the instance (SG is wide open to this range)"
   default     = "0.0.0.0/0"
+}
+
+variable "public_inbound_ipv6_cidr" {
+  type        = string
+  description = "Optional IPv6 CIDR for all inbound (e.g. ::/0). Set to null to omit IPv6 ingress."
+  default     = null
 }
 
 variable "app_dir" {

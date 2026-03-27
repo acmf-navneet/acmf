@@ -8,8 +8,8 @@ This provisions an Ubuntu EC2 instance for your GitHub Action workflow that depl
 ## What it creates
 
 - Security group:
-  - inbound `80/tcp` from the internet
-  - inbound `22/tcp` only from `allowed_ssh_cidr`
+  - inbound **all protocols/ports** from `public_inbound_cidr` (default `0.0.0.0/0`; restrict in production)
+  - optional IPv6 all-traffic rule via `public_inbound_ipv6_cidr` (e.g. `::/0`)
 - EC2 instance (default: Ubuntu Jammy 22.04)
 - Installs Docker + `docker compose` plugin via `user_data`
 - Pre-creates `app_dir` (default `/home/ubuntu/acmf`)
@@ -19,7 +19,7 @@ This provisions an Ubuntu EC2 instance for your GitHub Action workflow that depl
 
 - `aws_region`
 - `key_name` (existing EC2 key pair name)
-- `allowed_ssh_cidr` (for SSH access)
+- `public_inbound_cidr` (who may reach the instance on any port; default open to the world)
 
 ## Setup steps
 

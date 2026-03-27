@@ -4,7 +4,7 @@ output "instance_id" {
 }
 
 output "public_ip" {
-  value = (var.allocate_eip && length(aws_eip.this) > 0) ? aws_eip.this[0].public_ip : aws_instance.this.public_ip
+  value       = (var.allocate_eip && length(aws_eip.this) > 0) ? aws_eip.this[0].public_ip : aws_instance.this.public_ip
   description = "Public IP (Elastic IP if enabled)"
 }
 

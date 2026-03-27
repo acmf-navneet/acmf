@@ -239,6 +239,9 @@ public class ProjectController {
         String newProjectPath = null;
         Path tempRootDir = null;
         try {
+            // Resolve user first so we fail fast (before JHipster/GitHub). Avoids orphan repos on auth/DB mismatch.
+            User user = userService.findUserProfileByJwt(jwt);
+
             // Step 1: Log start of project generation
             logger.info("Starting project generation for baseName: {}", jdlRequest.getBaseName());
             String appBaseName = jdlRequest.getBaseName();
@@ -301,10 +304,7 @@ public class ProjectController {
                 throw new GitHubApiException(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to create GitHub repository.");
             }
 
-            // Step 11: Fetch authenticated user details using JWT
-            User user = userService.findUserProfileByJwt(jwt);
-
-            // Step 12: Save project details in database
+            // Step 11: Save project details in database
             Project project = new Project();
             project.setName(appBaseName);
             project.setCategory(jdlRequest.getApplicationType());

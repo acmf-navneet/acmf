@@ -230,8 +230,29 @@ public class GithubWorkflowService {
                               fi
                             done
 
+                            # Superuser must match ACMF EC2 postgres (deploy/.env.ec2), not hardcoded platform_admin
+                            EC2_APP_DIR="${{ secrets.EC2_APP_DIR }}"
+                            APP_ROOT="${EC2_APP_DIR:-/home/ubuntu/acmf}"
+                            ENV_FILE="$APP_ROOT/deploy/.env.ec2"
+                            if [ -f "$ENV_FILE" ]; then
+                              set -a
+                              . "$ENV_FILE"
+                              set +a
+                            fi
+                            PG_ADMIN_USER="${POSTGRES_USER:-postgres}"
+                            PG_ADMIN_PASSWORD="${POSTGRES_PASSWORD:-}"
+                            if [ -z "$PG_ADMIN_PASSWORD" ] && [ -n "$PG_CONTAINER" ]; then
+                              PG_ADMIN_USER=$(docker inspect "$PG_CONTAINER" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^POSTGRES_USER=//p' | head -1)
+                              PG_ADMIN_PASSWORD=$(docker inspect "$PG_CONTAINER" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^POSTGRES_PASSWORD=//p' | head -1)
+                            fi
+                            PG_ADMIN_USER="${PG_ADMIN_USER:-postgres}"
+                            if [ -z "$PG_ADMIN_PASSWORD" ]; then
+                              echo "ERROR: Could not resolve Postgres superuser password (set POSTGRES_* in deploy/.env.ec2 or ensure the container has POSTGRES_PASSWORD)."
+                              exit 1
+                            fi
+
                             count=0
-                            until docker exec "$PG_CONTAINER" sh -lc 'pg_isready -U platform_admin >/dev/null 2>&1 || pg_isready -U postgres >/dev/null 2>&1 || pg_isready >/dev/null 2>&1'; do
+                            until docker exec "$PG_CONTAINER" sh -lc "pg_isready -U \"$PG_ADMIN_USER\" >/dev/null 2>&1 || pg_isready >/dev/null 2>&1"; do
                               echo "Waiting for Postgres readiness ($PG_CONTAINER)... ($count/60)"
                               sleep 2
                               count=$(( ${count:-0} + 1 ))
@@ -242,25 +263,25 @@ public class GithubWorkflowService {
                               fi
                             done
                 
-                            docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -tAc \\
+                            docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d postgres -tAc \\
                             "SELECT 1 FROM pg_database WHERE datname='%4$s'" \\
-                            | grep -q 1 || docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \\
+                            | grep -q 1 || docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d postgres -c \\
                             "CREATE DATABASE %4$s;"
 
                             # Create user if it does not exist
-                            docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -tAc \\
+                            docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d postgres -tAc \\
                             "SELECT 1 FROM pg_roles WHERE rolname='%4$s_user'" \\
-                            | grep -q 1 || docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \\
+                            | grep -q 1 || docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d postgres -c \\
                             "CREATE USER %4$s_user;"
 
-                            docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \\
+                            docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d postgres -c \\
                             "ALTER USER %4$s_user WITH PASSWORD '%4$s_pass';"
 
                             # Grant privileges (safe to re-run)
-                            docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \\
+                            docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d postgres -c \\
                             "GRANT ALL PRIVILEGES ON DATABASE %4$s TO %4$s_user;"
 
-                            docker exec "$PG_CONTAINER" psql -U platform_admin -d %4$s -c \\
+                            docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d %4$s -c \\
                             "ALTER SCHEMA public OWNER TO %4$s_user;"
 
                             docker pull public.ecr.aws/c4d3l3m6/%4$s:latest
@@ -1029,9 +1050,30 @@ jobs:
                 exit 1
               fi
             done
+
+            # Superuser must match ACMF EC2 postgres (deploy/.env.ec2), not hardcoded platform_admin
+            EC2_APP_DIR="${{ secrets.EC2_APP_DIR }}"
+            APP_ROOT="${EC2_APP_DIR:-/home/ubuntu/acmf}"
+            ENV_FILE="$APP_ROOT/deploy/.env.ec2"
+            if [ -f "$ENV_FILE" ]; then
+              set -a
+              . "$ENV_FILE"
+              set +a
+            fi
+            PG_ADMIN_USER="${POSTGRES_USER:-postgres}"
+            PG_ADMIN_PASSWORD="${POSTGRES_PASSWORD:-}"
+            if [ -z "$PG_ADMIN_PASSWORD" ] && [ -n "$PG_CONTAINER" ]; then
+              PG_ADMIN_USER=$(docker inspect "$PG_CONTAINER" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^POSTGRES_USER=//p' | head -1)
+              PG_ADMIN_PASSWORD=$(docker inspect "$PG_CONTAINER" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^POSTGRES_PASSWORD=//p' | head -1)
+            fi
+            PG_ADMIN_USER="${PG_ADMIN_USER:-postgres}"
+            if [ -z "$PG_ADMIN_PASSWORD" ]; then
+              echo "ERROR: Could not resolve Postgres superuser password (set POSTGRES_* in deploy/.env.ec2 or ensure the container has POSTGRES_PASSWORD)."
+              exit 1
+            fi
             
             count=0
-            until docker exec "$PG_CONTAINER" sh -lc 'pg_isready -U platform_admin >/dev/null 2>&1 || pg_isready -U postgres >/dev/null 2>&1 || pg_isready >/dev/null 2>&1'; do
+            until docker exec "$PG_CONTAINER" sh -lc "pg_isready -U \"$PG_ADMIN_USER\" >/dev/null 2>&1 || pg_isready >/dev/null 2>&1"; do
               echo "Waiting for Postgres readiness... ($count/30)"
               sleep 2
               count=$(( ${count:-0} + 1 ))
@@ -1044,20 +1086,20 @@ jobs:
 
             # DB + user per service
             for SERVICE in %s; do
-              docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -tAc \
+              docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d postgres -tAc \
               "SELECT 1 FROM pg_database WHERE datname='${SERVICE}'" | grep -q 1 || \
-              docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \
+              docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d postgres -c \
               "CREATE DATABASE ${SERVICE};"
 
-              docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -tAc \
+              docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d postgres -tAc \
               "SELECT 1 FROM pg_roles WHERE rolname='${SERVICE}_user'" | grep -q 1 || \
-              docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \
+              docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d postgres -c \
               "CREATE USER ${SERVICE}_user WITH PASSWORD '${SERVICE}_pass';"
 
-              docker exec "$PG_CONTAINER" psql -U platform_admin -d postgres -c \
+              docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d postgres -c \
               "GRANT ALL PRIVILEGES ON DATABASE ${SERVICE} TO ${SERVICE}_user;"
 
-              docker exec "$PG_CONTAINER" psql -U platform_admin -d ${SERVICE} -c \
+              docker exec -e PGPASSWORD="$PG_ADMIN_PASSWORD" "$PG_CONTAINER" psql -U "$PG_ADMIN_USER" -d ${SERVICE} -c \
               "ALTER SCHEMA public OWNER TO ${SERVICE}_user;"
             done
 
